@@ -1,8 +1,70 @@
 #include <SFML/Graphics.hpp>
+#include <SFML/Audio.hpp>
 #include <iostream>
 #include <vector>
 #include <stdlib.h>
 #include <time.h>
+
+void SetupText(sf::Text &text, sf::Font &font)
+{
+    text.setFont(font);
+    text.setFillColor(sf::Color::Cyan);
+    text.setOutlineThickness(2.0f);
+    text.setOutlineColor(sf::Color::Black);
+}
+
+void LoadAsset(sf::Texture &slot, std::string asset)
+{
+    if (!slot.loadFromFile(asset))
+    {
+        // error
+        std::cout << "Texture load failed for '" + asset + "'" << std::endl;
+    }
+    else
+        std::cout << "Texture '" + asset + "' loaded successfully" << std::endl;
+}
+
+void LoadAsset(sf::Font &slot, std::string asset)
+{
+    if (!slot.loadFromFile(asset))
+    {
+        // error
+        std::cout << "Font load failed for '" + asset + "'" << std::endl;
+    }
+    else
+        std::cout << "Font '" + asset + "' loaded successfully" << std::endl;
+}
+
+void LoadAsset(sf::SoundBuffer& slot, std::string asset)
+{
+    if (!slot.loadFromFile(asset))
+    {
+        // error
+        std::cout << "Sound load failed for '" + asset + "'" << std::endl;
+    }
+    else
+        std::cout << "Sound '" + asset + "' loaded successfully" << std::endl;
+}
+
+void LoadAsset(sf::Music& slot, std::string asset)
+{
+    if (!slot.openFromFile(asset))
+    {
+        // error
+        std::cout << "Music load failed for '" + asset + "'" << std::endl;
+    }
+    else
+        std::cout << "Music '" + asset + "' loaded successfully" << std::endl;
+
+    slot.setVolume(50);
+    slot.setLoop(true);
+}
+
+void SetTexture(sf::Sprite &slot, sf::Texture &texture)
+{
+    slot.setTexture(texture);
+    slot.setOrigin(texture.getSize().x / 2, texture.getSize().y / 2);
+}
 
 int main()
 {
@@ -14,54 +76,30 @@ int main()
 
     srand(time(NULL));
 
-    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Pick Up Sticks", sf::Style::Fullscreen);
+    sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Pick Up Sticks", sf::Style::None);
 
     int scoreValue = 0;
 
     sf::Texture playerTexture;
-    if (!playerTexture.loadFromFile("Assets/Player_Stand.png"))
-    {
-        // error
-        std::cout << "Texture load failed for 'Assets/Player_Stand.png'" << std::endl;
-    }
-    else
-        std::cout << "Texture 'Assets/Player_Stand.png' loaded successfully" << std::endl;
-
+    LoadAsset(playerTexture, "Assets/Player_Stand.png");
     sf::Texture grassTexture;
-    if (!grassTexture.loadFromFile("Assets/Grass.png"))
-    {
-        // error
-        std::cout << "Texture load failed for 'Assets/Grass.png'" << std::endl;
-    }
-    else
-        std::cout << "Texture 'Assets/Grass.png' loaded successfully" << std::endl;
-
+    LoadAsset(grassTexture, "Assets/Grass.png");
     sf::Texture stickTexture;
-    if (!stickTexture.loadFromFile("Assets/Stick.png"))
-    {
-        // error
-        std::cout << "Texture load failed for 'Assets/Stick.png'" << std::endl;
-    }
-    else
-        std::cout << "Texture 'Assets/Stick.png' loaded successfully" << std::endl;
-
+    LoadAsset(stickTexture, "Assets/Stick.png");
 
     sf::Sprite playerSprite;
-    playerSprite.setTexture(playerTexture);
-    playerSprite.setOrigin(playerTexture.getSize().x / 2, playerTexture.getSize().y / 2);
+    SetTexture(playerSprite, playerTexture);
     sf::Sprite grassSprite;
-    grassSprite.setTexture(grassTexture);
-    grassSprite.setOrigin(grassTexture.getSize().x / 2, grassTexture.getSize().y / 2);
+    SetTexture(grassSprite, grassTexture);
     sf::Sprite stickSprite;
-    stickSprite.setTexture(stickTexture);
-    stickSprite.setOrigin(stickTexture.getSize().x / 2, stickTexture.getSize().y / 2);
+    SetTexture(stickSprite, stickTexture);
 
+
+    // Position setup
+    playerSprite.setPosition(window.getSize().x/2, window.getSize().y/2);
 
     // Colour setup
-    playerSprite.setColor(sf::Color(190, 150, 230));
-
-    // Rotation example
-    playerSprite.setRotation(90);
+    //playerSprite.setColor(sf::Color(0, 200, 150));
 
     // Scale example
     //playerSprite.setScale(4.0f, 0.75f);
@@ -87,26 +125,43 @@ int main()
 
     // Load Fonts
     sf::Font gameFont;
-    gameFont.loadFromFile("Assets/GameFont.ttf");
-
+    LoadAsset(gameFont, "Assets/GameFont.ttf");
+    
     // Create text objects
     sf::Text gameTitle;
-    gameTitle.setFont(gameFont);
+    SetupText(gameTitle, gameFont);
     gameTitle.setString("Pick Up Sticks");
-    float textWidth = gameTitle.getLocalBounds().width;
-    gameTitle.setPosition((window.getSize().x/2.0f) - textWidth/2.0f, 75.0f);
+    gameTitle.setPosition((window.getSize().x/2.0f) - (gameTitle.getLocalBounds().width/2.0f), 75.0f);
 
     sf::Text scoreText;
-    scoreText.setFont(gameFont);
+    SetupText(scoreText, gameFont);
     scoreText.setString("Score: ");
     scoreText.setPosition(75.0f, 75.0f);
 
     sf::Text scoreVal;
-    scoreVal.setFont(gameFont);
-    scoreVal.setString("value here");
+    SetupText(scoreVal, gameFont);
+    scoreVal.setString(std::to_string(scoreValue));
     scoreVal.setPosition(250.0f, 75.0f);
 
 
+    // Load Sound
+    sf::SoundBuffer buffer;
+
+    LoadAsset(buffer, "Assets/Start.wav");
+    sf::Sound startSound;
+    startSound.setBuffer(buffer);
+    startSound.play();
+
+    LoadAsset(buffer, "Assets/Pickup.wav");
+    sf::Sound stickSound;
+    stickSound.setBuffer(buffer);
+    stickSound.setPitch((5 + rand() % 10) / 10.0f);
+
+
+    // Stream Music
+    sf::Music gameMusic;
+    LoadAsset(gameMusic, "Assets/Music.ogg");
+    gameMusic.play();
 
 # pragma endregion
 
@@ -122,8 +177,51 @@ int main()
         while (window.pollEvent(event))
         {
             if (event.type == sf::Event::KeyPressed)
+            {
                 if (event.key.code == sf::Keyboard::Escape)
                     window.close();
+                if (event.key.code == sf::Keyboard::W || event.key.code == sf::Keyboard::Up)
+                    playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 20.0f);
+                if (event.key.code == sf::Keyboard::S || event.key.code == sf::Keyboard::Down)
+                    playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 20.0f);
+
+                if (event.key.code == sf::Keyboard::A || event.key.code == sf::Keyboard::Left)
+                {
+                    playerSprite.setPosition(playerSprite.getPosition().x - 20.0f, playerSprite.getPosition().y);
+                    playerSprite.setScale(-1, 1);
+                }
+                if (event.key.code == sf::Keyboard::D || event.key.code == sf::Keyboard::Right)
+                {
+                    playerSprite.setPosition(playerSprite.getPosition().x + 20.0f, playerSprite.getPosition().y);
+                    playerSprite.setScale(1, 1);
+                }
+            }
+
+            if (playerSprite.getPosition().x < 0)
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().x > (window.getSize().x))
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().y < 0)
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().y > (window.getSize().y))
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
+                scoreValue++;
+                stickSound.play();
+            }
+
         }
 
 #pragma endregion
@@ -141,13 +239,12 @@ int main()
             window.draw(stickVector[i]);
         window.draw(playerSprite);
 
+        scoreVal.setString(std::to_string(scoreValue));
+
         window.draw(gameTitle);
         window.draw(scoreText);
         window.draw(scoreVal);
         window.display();
-
-    // Position Setup
-    playerSprite.setPosition(sf::Vector2f(100.0f, 100.0f));
 
 #pragma endregion
 
