@@ -135,13 +135,8 @@ int main()
 
     sf::Text scoreText;
     SetupText(scoreText, gameFont);
-    scoreText.setString("Score: ");
+    scoreText.setString("Score: " + scoreValue);
     scoreText.setPosition(75.0f, 75.0f);
-
-    sf::Text scoreVal;
-    SetupText(scoreVal, gameFont);
-    scoreVal.setString(std::to_string(scoreValue));
-    scoreVal.setPosition(250.0f, 75.0f);
 
 
     // Load Sound
@@ -163,6 +158,12 @@ int main()
     LoadAsset(gameMusic, "Assets/Music.ogg");
     gameMusic.play();
 
+
+    bool dashState = false;
+    int lastXDir = 0;
+    int lastYDir = 0;
+
+
 # pragma endregion
 
     //-----------------------------------------------------------------
@@ -180,49 +181,153 @@ int main()
             {
                 if (event.key.code == sf::Keyboard::Escape)
                     window.close();
-                if (event.key.code == sf::Keyboard::W || event.key.code == sf::Keyboard::Up)
-                    playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 20.0f);
-                if (event.key.code == sf::Keyboard::S || event.key.code == sf::Keyboard::Down)
-                    playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 20.0f);
-
-                if (event.key.code == sf::Keyboard::A || event.key.code == sf::Keyboard::Left)
-                {
-                    playerSprite.setPosition(playerSprite.getPosition().x - 20.0f, playerSprite.getPosition().y);
-                    playerSprite.setScale(-1, 1);
-                }
-                if (event.key.code == sf::Keyboard::D || event.key.code == sf::Keyboard::Right)
-                {
-                    playerSprite.setPosition(playerSprite.getPosition().x + 20.0f, playerSprite.getPosition().y);
-                    playerSprite.setScale(1, 1);
-                }
             }
-
-            if (playerSprite.getPosition().x < 0)
-            {
-                playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
-                scoreValue++;
-                stickSound.play();
-            }
-            if (playerSprite.getPosition().x > (window.getSize().x))
-            {
-                playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
-                scoreValue++;
-                stickSound.play();
-            }
-            if (playerSprite.getPosition().y < 0)
-            {
-                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
-                scoreValue++;
-                stickSound.play();
-            }
-            if (playerSprite.getPosition().y > (window.getSize().y))
-            {
-                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
-                scoreValue++;
-                stickSound.play();
-            }
-
         }
+
+#pragma endregion
+
+        //-----------------------------------------------------------------
+        // Update
+        //-----------------------------------------------------------------
+
+#pragma region Update
+
+        sf::Vector2f direction(0, 0);
+        if (sf::Joystick::isConnected(1))
+        {
+            float axisX = sf::Joystick::getAxisPosition(1, sf::Joystick::X);
+            float axisY = sf::Joystick::getAxisPosition(1, sf::Joystick::Y);
+
+            float deadzone = 0;
+
+            if (abs(axisX) > deadzone)
+                direction.x = axisX / 100.0f;
+            if (abs(axisY) > deadzone)
+                direction.y = axisY / 100.0f;
+        }
+        
+        if (dashState == false && (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Joystick::isButtonPressed(1, 0)))
+        {
+            switch (lastXDir)
+            {
+                case 1:
+                {
+                    direction.x = -1500;
+                    break;
+                }
+                case 2:
+                {
+                    direction.x = 1500;
+                    break;
+                }
+                default:
+                {
+                    direction.x = 0;
+                    break;
+                }
+            }
+            switch (lastYDir)
+            {
+            case 1:
+            {
+                direction.y = -1500;
+                break;
+            }
+            case 2:
+            {
+                direction.y = 1500;
+                break;
+            }
+            default:
+            {
+                direction.y = 0;
+                break;
+            }
+            }
+            dashState = true;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) == false && sf::Joystick::isButtonPressed(1, 0) == false)
+        {
+            dashState = false;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::A))
+        {
+            direction.x = -1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::D))
+        {
+            direction.x = 1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::W))
+        {
+            direction.y = -1;
+        }
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+        {
+            direction.y = 1;
+        }
+        
+        if (direction.x < 0)
+        {
+            lastXDir = 1;
+        }
+        if (direction.x > 0)
+        {
+            lastXDir = 2;
+        }
+        if (direction.y < 0)
+        {
+            lastYDir = 1;
+        }
+        if (direction.y > 0)
+        {
+            lastYDir = 2;
+        }
+
+        playerSprite.move(direction*0.1f);
+
+
+        if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
+        {
+            // Get Mouse Position
+            sf::Vector2i localPos = sf::Mouse::getPosition(window);
+            sf::Vector2f mousePosFloat = (sf::Vector2f)localPos;
+
+            // Spawn Stick at Location
+            stickSprite.setPosition(mousePosFloat);
+            stickVector.push_back(stickSprite);
+        }
+
+
+        // Bump off wall and increase score
+        if (playerSprite.getPosition().x < 0)
+        {
+            playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
+            scoreValue++;
+            stickSound.play();
+        }
+        if (playerSprite.getPosition().x > (window.getSize().x))
+        {
+            playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
+            scoreValue++;
+            stickSound.play();
+        }
+        if (playerSprite.getPosition().y < 0)
+        {
+            playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
+            scoreValue++;
+            stickSound.play();
+        }
+        if (playerSprite.getPosition().y > (window.getSize().y))
+        {
+            playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
+            scoreValue++;
+            stickSound.play();
+        }
+
+
+        scoreText.setString("Score: " + std::to_string(scoreValue));
+
 
 #pragma endregion
 
@@ -239,11 +344,9 @@ int main()
             window.draw(stickVector[i]);
         window.draw(playerSprite);
 
-        scoreVal.setString(std::to_string(scoreValue));
 
         window.draw(gameTitle);
         window.draw(scoreText);
-        window.draw(scoreVal);
         window.display();
 
 #pragma endregion
