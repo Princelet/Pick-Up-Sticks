@@ -5,10 +5,27 @@
 #include <stdlib.h>
 #include <time.h>
 
-void SetupText(sf::Text &text, sf::Font &font)
+enum GameState
 {
+    RUNNING,                   // RUNNING = 0;
+    GAME_OVER,               // GAME_OVER = 1;
+    NUM_GAME_STATES // Leave last in list to give count
+};
+
+
+void SetupText(sf::Text &text, sf::Font &font, std::string color)
+{
+    sf::Color textColor;
+    if (color == "Cyan")
+    {
+        textColor = sf::Color::Cyan;
+    }
+    if (color == "Red")
+    {
+        textColor = sf::Color::Red;
+    }
     text.setFont(font);
-    text.setFillColor(sf::Color::Cyan);
+    text.setFillColor(textColor);
     text.setOutlineThickness(2.0f);
     text.setOutlineColor(sf::Color::Black);
 }
@@ -66,6 +83,35 @@ void SetTexture(sf::Sprite &slot, sf::Texture &texture)
     slot.setOrigin(texture.getSize().x / 2, texture.getSize().y / 2);
 }
 
+sf::Vector2f ScreenBorder(sf::RenderWindow &window, sf::Texture &texture)
+{
+    int screenBorder = 100;
+    sf::Vector2f returnVal;
+    returnVal.x = (rand() % window.getSize().x - texture.getSize().x);
+    returnVal.y = (rand() % window.getSize().y - texture.getSize().y);
+
+    if (returnVal.x > (window.getSize().x - screenBorder))
+    {
+        returnVal.x = returnVal.x - screenBorder;
+    }
+    if (returnVal.x < screenBorder)
+    {
+        returnVal.x = returnVal.x + screenBorder;
+    }
+
+    if (returnVal.y > (window.getSize().y - screenBorder))
+    {
+        returnVal.y = returnVal.y - screenBorder;
+    }
+    if (returnVal.y < screenBorder)
+    {
+        returnVal.y = returnVal.y + screenBorder;
+    }
+
+    return (returnVal);
+}
+
+
 int main()
 {
     //-----------------------------------------------------------------
@@ -74,9 +120,10 @@ int main()
 
 #pragma region Setup
 
-    srand(time(NULL));
+    srand(time(nullptr));
 
     sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Pick Up Sticks", sf::Style::None);
+
 
     int scoreValue = 0;
 
@@ -112,7 +159,8 @@ int main()
     {
         float grassScale = (float)(0.5 + rand() % 10) / 10.0f;
         grassVector.push_back(grassSprite);
-        grassVector[i].setPosition((rand() % window.getSize().x - grassTexture.getSize().x), (rand() % window.getSize().y - grassTexture.getSize().y));
+        sf::Vector2f grassPos = ScreenBorder(window, grassTexture);
+        grassVector[i].setPosition(grassPos);
         grassVector[i].setColor(sf::Color(100 + rand() % 100, 30 + rand() % 200, 100 + rand() % 50)); 
         grassVector[i].setScale(grassScale, grassScale);
     }
@@ -129,14 +177,34 @@ int main()
     
     // Create text objects
     sf::Text gameTitle;
-    SetupText(gameTitle, gameFont);
+    SetupText(gameTitle, gameFont, "Cyan");
     gameTitle.setString("Pick Up Sticks");
     gameTitle.setPosition((window.getSize().x/2.0f) - (gameTitle.getLocalBounds().width/2.0f), 75.0f);
 
+    sf::Text gameOverText;
+    SetupText(gameOverText, gameFont, "Red");
+    gameOverText.setString("Game Over");
+    gameOverText.setPosition((window.getSize().x / 2.0f) - (gameTitle.getLocalBounds().width / 2.0f), (window.getSize().y / 2.0f) - (gameTitle.getLocalBounds().height / 2.0f));
+
+    sf::Text restartText;
+    SetupText(restartText, gameFont, "Red");
+    restartText.setString("Press Enter to restart");
+    restartText.setPosition((window.getSize().x / 2.0f) - (gameTitle.getLocalBounds().width / 2.0f), (window.getSize().y / 2.0f) + 100.0f);
+
     sf::Text scoreText;
-    SetupText(scoreText, gameFont);
+    SetupText(scoreText, gameFont, "Cyan");
     scoreText.setString("Score: " + scoreValue);
     scoreText.setPosition(75.0f, 75.0f);
+
+    sf::Text timeText;
+    SetupText(timeText, gameFont, "Cyan");
+    timeText.setString("Time: ");
+    timeText.setPosition(window.getSize().x - 510.0f, 75.0f);
+
+    sf::Text stickText;
+    SetupText(stickText, gameFont, "Cyan");
+    stickText.setString("Stick Time: ");
+    stickText.setPosition(window.getSize().x - 510.0f, 100.0f);
 
 
     // Load Sound
@@ -162,6 +230,20 @@ int main()
     bool dashState = false;
     int lastXDir = 0;
     int lastYDir = 0;
+
+
+    // Clocks and Timers
+    sf::Clock deltaTimeClock;
+    sf::Clock overallTimeClock;
+
+    sf::Clock gameTimer;
+    float gameDuration = 20;
+
+    sf::Clock stickSpawnClock;
+    float stickInterval = 3;
+
+    GameState currentState = RUNNING;
+
 
 
 # pragma endregion
@@ -192,24 +274,48 @@ int main()
 
 #pragma region Update
 
-        sf::Vector2f direction(0, 0);
-        if (sf::Joystick::isConnected(1))
+        // Get Time
+        sf::Time deltaTime = deltaTimeClock.restart();
+        sf::Time totalTime = overallTimeClock.getElapsedTime();
+
+        float gameTimeFloat = gameTimer.getElapsedTime().asSeconds();
+        float remainingTimeFloat = gameDuration - gameTimeFloat;
+        timeText.setString("Time: " + std::to_string((int)ceil(remainingTimeFloat)));
+
+        float stickTimeFloat = stickSpawnClock.getElapsedTime().asSeconds();
+        float stickIntervalFloat = stickInterval - stickTimeFloat;
+
+
+
+        if (remainingTimeFloat <= 0)
         {
-            float axisX = sf::Joystick::getAxisPosition(1, sf::Joystick::X);
-            float axisY = sf::Joystick::getAxisPosition(1, sf::Joystick::Y);
-
-            float deadzone = 0;
-
-            if (abs(axisX) > deadzone)
-                direction.x = axisX / 100.0f;
-            if (abs(axisY) > deadzone)
-                direction.y = axisY / 100.0f;
+            remainingTimeFloat = 0;
+            currentState = GAME_OVER;
         }
-        
-        if (dashState == false && (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Joystick::isButtonPressed(1, 0)))
+
+
+        // Movement code
+        // Only process logic when game running
+        if (currentState == RUNNING)
         {
-            switch (lastXDir)
+            sf::Vector2f direction(0, 0);
+            if (sf::Joystick::isConnected(1))
             {
+                float axisX = sf::Joystick::getAxisPosition(1, sf::Joystick::X);
+                float axisY = sf::Joystick::getAxisPosition(1, sf::Joystick::Y);
+
+                float deadzone = 25;
+
+                if (abs(axisX) > deadzone)
+                    direction.x = axisX / 100.0f;
+                if (abs(axisY) > deadzone)
+                    direction.y = axisY / 100.0f;
+            }
+
+            if (dashState == false && (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) || sf::Joystick::isButtonPressed(1, 0)))
+            {
+                switch (lastXDir)
+                {
                 case 1:
                 {
                     direction.x = -1500;
@@ -225,68 +331,129 @@ int main()
                     direction.x = 0;
                     break;
                 }
+                }
+                switch (lastYDir)
+                {
+                case 1:
+                {
+                    direction.y = -1500;
+                    break;
+                }
+                case 2:
+                {
+                    direction.y = 1500;
+                    break;
+                }
+                default:
+                {
+                    direction.y = 0;
+                    break;
+                }
+                }
+                dashState = true;
             }
-            switch (lastYDir)
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) == false && sf::Joystick::isButtonPressed(1, 0) == false)
             {
-            case 1:
+                dashState = false;
+            }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::A))
             {
-                direction.y = -1500;
-                break;
+                direction.x = -1;
             }
-            case 2:
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::D))
             {
-                direction.y = 1500;
-                break;
+                direction.x = 1;
             }
-            default:
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::W))
             {
-                direction.y = 0;
-                break;
+                direction.y = -1;
             }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::S))
+            {
+                direction.y = 1;
             }
-            dashState = true;
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) == false && sf::Joystick::isButtonPressed(1, 0) == false)
-        {
-            dashState = false;
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left) || sf::Keyboard::isKeyPressed(sf::Keyboard::A))
-        {
-            direction.x = -1;
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right) || sf::Keyboard::isKeyPressed(sf::Keyboard::D))
-        {
-            direction.x = 1;
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up) || sf::Keyboard::isKeyPressed(sf::Keyboard::W))
-        {
-            direction.y = -1;
-        }
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::S))
-        {
-            direction.y = 1;
-        }
-        
-        if (direction.x < 0)
-        {
-            lastXDir = 1;
-        }
-        if (direction.x > 0)
-        {
-            lastXDir = 2;
-        }
-        if (direction.y < 0)
-        {
-            lastYDir = 1;
-        }
-        if (direction.y > 0)
-        {
-            lastYDir = 2;
-        }
 
-        playerSprite.move(direction*0.1f);
+            if (direction.x < 0)
+            {
+                lastXDir = 1;
+            }
+            if (direction.x > 0)
+            {
+                lastXDir = 2;
+            }
+            if (direction.y < 0)
+            {
+                lastYDir = 1;
+            }
+            if (direction.y > 0)
+            {
+                lastYDir = 2;
+            }
 
 
+            // Update player position based on movement direction
+            float speed = 500;
+            // velocity = direction * speed
+            sf::Vector2f velocity = direction * speed;
+            // displacement = velocity * time
+            sf::Vector2f displacement = velocity * deltaTime.asSeconds();
+
+            playerSprite.move(displacement);
+
+
+            // Bump off wall and increase score
+            if (playerSprite.getPosition().x < 0)
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().x > (window.getSize().x))
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().y < 0)
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
+                scoreValue++;
+                stickSound.play();
+            }
+            if (playerSprite.getPosition().y > (window.getSize().y))
+            {
+                playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
+                scoreValue++;
+                stickSound.play();
+            }
+
+
+            // Stick Spawning
+            if (stickIntervalFloat <= 0)
+            {
+                sf::Vector2f stickPos = ScreenBorder(window, stickTexture);
+                stickSprite.setPosition(stickPos);
+                stickSprite.setRotation((float)(rand() % 360));
+                stickVector.push_back(stickSprite);
+
+                stickSpawnClock.restart();
+            }
+
+            // End of Game Running
+        }
+
+        if (currentState == GAME_OVER)
+        {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
+            {
+                gameTimer.restart();
+                playerSprite.setPosition(window.getSize().x / 2.0f, window.getSize().y / 2.0f);
+                currentState = RUNNING;
+            }
+        }
+
+        // Spawn Stick on Mouse
+        /*
         if (sf::Mouse::isButtonPressed(sf::Mouse::Left))
         {
             // Get Mouse Position
@@ -297,34 +464,7 @@ int main()
             stickSprite.setPosition(mousePosFloat);
             stickVector.push_back(stickSprite);
         }
-
-
-        // Bump off wall and increase score
-        if (playerSprite.getPosition().x < 0)
-        {
-            playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
-            scoreValue++;
-            stickSound.play();
-        }
-        if (playerSprite.getPosition().x > (window.getSize().x))
-        {
-            playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
-            scoreValue++;
-            stickSound.play();
-        }
-        if (playerSprite.getPosition().y < 0)
-        {
-            playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
-            scoreValue++;
-            stickSound.play();
-        }
-        if (playerSprite.getPosition().y > (window.getSize().y))
-        {
-            playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
-            scoreValue++;
-            stickSound.play();
-        }
-
+        */
 
         scoreText.setString("Score: " + std::to_string(scoreValue));
 
@@ -347,6 +487,14 @@ int main()
 
         window.draw(gameTitle);
         window.draw(scoreText);
+        window.draw(timeText);
+
+        if (currentState == GAME_OVER)
+        {
+            window.draw(gameOverText);
+            window.draw(restartText);
+        }
+
         window.display();
 
 #pragma endregion
