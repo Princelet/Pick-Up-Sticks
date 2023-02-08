@@ -5,13 +5,12 @@
 #include <stdlib.h>
 #include <time.h>
 
-enum GameState
+enum class GameState
 {
     RUNNING,                   // RUNNING = 0;
     GAME_OVER,               // GAME_OVER = 1;
     NUM_GAME_STATES // Leave last in list to give count
 };
-
 
 void SetupText(sf::Text &text, sf::Font &font, std::string color)
 {
@@ -121,12 +120,11 @@ int main()
 #pragma region Setup
 
     srand(time(nullptr));
-
     sf::RenderWindow window(sf::VideoMode::getDesktopMode(), "Pick Up Sticks", sf::Style::None);
-
 
     int scoreValue = 0;
 
+    // Sprite setup
     sf::Texture playerTexture;
     LoadAsset(playerTexture, "Assets/Player_Stand.png");
     sf::Texture grassTexture;
@@ -145,19 +143,11 @@ int main()
     // Position setup
     playerSprite.setPosition(window.getSize().x/2, window.getSize().y/2);
 
-    // Colour setup
-    //playerSprite.setColor(sf::Color(0, 200, 150));
-
-    // Scale example
-    //playerSprite.setScale(4.0f, 0.75f);
-
-
-    // Position setup
     std::vector<sf::Sprite> grassVector;
     int numGrassToAdd = 15;
     for (int i = 0; i < numGrassToAdd; ++i)
     {
-        float grassScale = (float)(0.5 + rand() % 10) / 10.0f;
+        float grassScale = (float)(0.7 + rand() % 10) / 10.0f;
         grassVector.push_back(grassSprite);
         sf::Vector2f grassPos = ScreenBorder(window, grassTexture);
         grassVector[i].setPosition(grassPos);
@@ -201,11 +191,6 @@ int main()
     timeText.setString("Time: ");
     timeText.setPosition(window.getSize().x - 510.0f, 75.0f);
 
-    sf::Text stickText;
-    SetupText(stickText, gameFont, "Cyan");
-    stickText.setString("Stick Time: ");
-    stickText.setPosition(window.getSize().x - 510.0f, 100.0f);
-
 
     // Load Sound
     sf::SoundBuffer buffer;
@@ -242,7 +227,7 @@ int main()
     sf::Clock stickSpawnClock;
     float stickInterval = 3;
 
-    GameState currentState = RUNNING;
+    GameState currentState = GameState::RUNNING;
 
 
 
@@ -285,19 +270,18 @@ int main()
         float stickTimeFloat = stickSpawnClock.getElapsedTime().asSeconds();
         float stickIntervalFloat = stickInterval - stickTimeFloat;
 
-
-
+        // Gameover timer
         if (remainingTimeFloat <= 0)
         {
             remainingTimeFloat = 0;
-            currentState = GAME_OVER;
+            currentState = GameState::GAME_OVER;
         }
 
 
-        // Movement code
         // Only process logic when game running
-        if (currentState == RUNNING)
+        if (currentState == GameState::RUNNING)
         {
+            // Movement code
             sf::Vector2f direction(0, 0);
             if (sf::Joystick::isConnected(1))
             {
@@ -405,26 +389,18 @@ int main()
             if (playerSprite.getPosition().x < 0)
             {
                 playerSprite.setPosition(playerSprite.getPosition().x + 150.0f, playerSprite.getPosition().y);
-                scoreValue++;
-                stickSound.play();
             }
             if (playerSprite.getPosition().x > (window.getSize().x))
             {
                 playerSprite.setPosition(playerSprite.getPosition().x - 150.0f, playerSprite.getPosition().y);
-                scoreValue++;
-                stickSound.play();
             }
             if (playerSprite.getPosition().y < 0)
             {
                 playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y + 150.0f);
-                scoreValue++;
-                stickSound.play();
             }
             if (playerSprite.getPosition().y > (window.getSize().y))
             {
                 playerSprite.setPosition(playerSprite.getPosition().x, playerSprite.getPosition().y - 150.0f);
-                scoreValue++;
-                stickSound.play();
             }
 
 
@@ -439,16 +415,43 @@ int main()
                 stickSpawnClock.restart();
             }
 
+            // Stick Detection
+            sf::FloatRect playerBounds = playerSprite.getGlobalBounds();
+            for (auto it = stickVector.begin(); it != stickVector.end();)
+                //int i = stickVector.size() - 1; i >= 0 ; --i
+            {
+                sf::FloatRect stickBounds = it->getGlobalBounds();
+
+                // If Stick and Player overlap...
+                if (playerBounds.intersects(stickBounds))
+                {
+                    // Delete Stick
+                    it = stickVector.erase(it);
+                    // Add to Score
+                    scoreValue++;
+                    stickSound.play();
+                    // Update Score Text
+
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+
+            scoreText.setString("Score: " + std::to_string(scoreValue));
+
             // End of Game Running
         }
 
-        if (currentState == GAME_OVER)
+        if (currentState == GameState::GAME_OVER)
         {
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Enter))
             {
                 gameTimer.restart();
                 playerSprite.setPosition(window.getSize().x / 2.0f, window.getSize().y / 2.0f);
-                currentState = RUNNING;
+                scoreValue = 0;
+                currentState = GameState::RUNNING;
             }
         }
 
@@ -465,8 +468,7 @@ int main()
             stickVector.push_back(stickSprite);
         }
         */
-
-        scoreText.setString("Score: " + std::to_string(scoreValue));
+        
 
 
 #pragma endregion
@@ -489,7 +491,7 @@ int main()
         window.draw(scoreText);
         window.draw(timeText);
 
-        if (currentState == GAME_OVER)
+        if (currentState == GameState::GAME_OVER)
         {
             window.draw(gameOverText);
             window.draw(restartText);
